@@ -69,3 +69,4 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Sluice.app/Contents/MacOS/Sluice"
         PRODUCT_BUNDLE_IDENTIFIER: com.gimpel.SluiceTests
+        GENERATE_INFOPLIST_FILE: YES

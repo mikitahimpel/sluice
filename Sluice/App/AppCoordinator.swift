@@ -13,9 +13,13 @@ public final class AppCoordinator: ObservableObject {
     public let defaultBrowserClient: DefaultBrowserClient
     private let ruleStore: RuleStore
     private let router: Router
+    private let sourceDetector: SourceDetecting
+    private let opener: URLOpening
     // Indirection so Router's escaping closure can read the latest RuleSet
     // without capturing `self` (avoids retain cycle and init-order issues).
     private let ruleSetBox: RuleSetBox
+
+    @Published var activeOverridePicker: OverridePickerWindowController?
 
     public init(
         ruleStore: RuleStore,
@@ -27,6 +31,8 @@ public final class AppCoordinator: ObservableObject {
         routeLog: RouteLog = RouteLog()
     ) {
         self.ruleStore = ruleStore
+        self.sourceDetector = sourceDetector
+        self.opener = opener
         self.browserCatalog = browserCatalog
         self.appCatalog = appCatalog
         self.defaultBrowserClient = defaultBrowserClient
@@ -58,6 +64,42 @@ public final class AppCoordinator: ObservableObject {
         } catch {
             NSLog("AppCoordinator: routing failed: %@", String(describing: error))
         }
+    }
+
+    public func handleWithOverride(urls: [URL]) {
+        let unwrapped = urls.map { LinkUnwrapper.unwrap($0) }
+        guard !unwrapped.isEmpty else { return }
+        let source = sourceDetector.currentSourceApp()
+        let browsers = browserCatalog.installedBrowsers()
+
+        let controller = OverridePickerWindowController(
+            urls: unwrapped,
+            browsers: browsers,
+            onPick: { [weak self] bundleID in
+                guard let self else { return }
+                do {
+                    try self.opener.open(unwrapped, with: bundleID)
+                } catch {
+                    NSLog("AppCoordinator: override open failed: %@", String(describing: error))
+                }
+                let now = Date()
+                for url in unwrapped {
+                    self.routeLog.append(RouteEvent(
+                        timestamp: now,
+                        url: url,
+                        sourceBundleID: source,
+                        target: bundleID,
+                        matchedRuleID: nil
+                    ))
+                }
+                self.activeOverridePicker = nil
+            },
+            onCancel: { [weak self] in
+                self?.activeOverridePicker = nil
+            }
+        )
+        activeOverridePicker = controller
+        controller.present()
     }
 
     public func updateRuleSet(_ newRuleSet: RuleSet) {

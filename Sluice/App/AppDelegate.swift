@@ -10,8 +10,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
+        let optionHeld = NSEvent.modifierFlags.contains(.option)
         MainActor.assumeIsolated {
-            coordinator.handle(urls: urls)
+            if optionHeld {
+                coordinator.handleWithOverride(urls: urls)
+            } else {
+                coordinator.handle(urls: urls)
+            }
         }
     }
 }

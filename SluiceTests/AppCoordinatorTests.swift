@@ -284,6 +284,20 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(store.saveCallCount, saveCountBefore)
     }
 
+    func testHandleWithOverrideQueuesPickerWithoutRouting() {
+        let figmaRule = Rule(match: .urlHost(glob: "*.figma.com"), target: figmaDesktop)
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [figmaRule])
+        let store = FakeRuleStore(initial: initial)
+        let opener = FakeOpener()
+        let coordinator = makeCoordinator(store: store, opener: opener)
+
+        XCTAssertNil(coordinator.activeOverridePicker)
+        coordinator.handleWithOverride(urls: [URL(string: "https://www.figma.com/file/1")!])
+
+        XCTAssertTrue(opener.calls.isEmpty)
+        XCTAssertNotNil(coordinator.activeOverridePicker)
+    }
+
     func testReloadRuleSetReadsFromStore() {
         let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
         let store = FakeRuleStore(initial: initial)

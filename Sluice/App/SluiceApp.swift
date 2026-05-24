@@ -6,9 +6,29 @@ struct SluiceApp: App {
 
     var body: some Scene {
         Settings {
-            Text("Sluice preferences — coming soon.")
-                .padding()
-                .frame(width: 480, height: 320)
+            ContentPlaceholderView()
+                .environmentObject(appDelegate.coordinator)
         }
+    }
+}
+
+private struct ContentPlaceholderView: View {
+    @EnvironmentObject private var coordinator: AppCoordinator
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Sluice").font(.title)
+            Text("Default browser: \(coordinator.defaultBrowserClient.currentDefaultBrowser() ?? "unknown")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Rules: \(coordinator.ruleSet.rules.count)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Preferences UI coming soon.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .frame(width: 480, height: 320)
     }
 }

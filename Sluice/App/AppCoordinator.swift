@@ -1,0 +1,121 @@
+import Foundation
+import SwiftUI
+import SluiceCore
+
+@MainActor
+public final class AppCoordinator: ObservableObject {
+    @Published public private(set) var ruleSet: RuleSet {
+        didSet { ruleSetBox.value = ruleSet }
+    }
+    public let routeLog: RouteLog
+    public let browserCatalog: BrowserCatalog
+    public let appCatalog: AppCatalog
+    public let defaultBrowserClient: DefaultBrowserClient
+    private let ruleStore: RuleStore
+    private let router: Router
+    // Indirection so Router's escaping closure can read the latest RuleSet
+    // without capturing `self` (avoids retain cycle and init-order issues).
+    private let ruleSetBox: RuleSetBox
+
+    public init(
+        ruleStore: RuleStore,
+        sourceDetector: SourceDetecting,
+        opener: URLOpening,
+        browserCatalog: BrowserCatalog = BrowserCatalog(),
+        appCatalog: AppCatalog = AppCatalog(),
+        defaultBrowserClient: DefaultBrowserClient = DefaultBrowserClient(),
+        routeLog: RouteLog = RouteLog()
+    ) {
+        self.ruleStore = ruleStore
+        self.browserCatalog = browserCatalog
+        self.appCatalog = appCatalog
+        self.defaultBrowserClient = defaultBrowserClient
+        self.routeLog = routeLog
+
+        let loaded: RuleSet
+        do {
+            loaded = try ruleStore.load()
+        } catch {
+            NSLog("AppCoordinator: failed to load RuleSet, using default: %@", String(describing: error))
+            loaded = RuleSet(version: 1, defaultBrowser: "com.apple.Safari", rules: [])
+        }
+        let box = RuleSetBox(value: loaded)
+        self.ruleSetBox = box
+        self.ruleSet = loaded
+
+        self.router = Router(
+            ruleSetProvider: { box.value },
+            sourceDetector: sourceDetector,
+            opener: opener,
+            log: routeLog
+        )
+    }
+
+    public func handle(urls: [URL]) {
+        do {
+            try router.route(urls)
+        } catch {
+            NSLog("AppCoordinator: routing failed: %@", String(describing: error))
+        }
+    }
+
+    public func updateRuleSet(_ newRuleSet: RuleSet) {
+        ruleSet = newRuleSet
+        do {
+            try ruleStore.save(newRuleSet)
+        } catch {
+            NSLog("AppCoordinator: failed to save RuleSet: %@", String(describing: error))
+        }
+    }
+
+    public func reloadRuleSet() {
+        do {
+            ruleSet = try ruleStore.load()
+        } catch {
+            NSLog("AppCoordinator: failed to reload RuleSet: %@", String(describing: error))
+        }
+    }
+
+    public static func makeDefault() -> AppCoordinator {
+        let store: RuleStore
+        do {
+            store = try FileSystemRuleStore()
+        } catch {
+            NSLog("AppCoordinator: FileSystemRuleStore init failed, falling back to in-memory store: %@", String(describing: error))
+            store = InMemoryRuleStore()
+        }
+        return AppCoordinator(
+            ruleStore: store,
+            sourceDetector: SourceDetector(),
+            opener: URLOpener()
+        )
+    }
+}
+
+private final class RuleSetBox {
+    var value: RuleSet
+    init(value: RuleSet) {
+        self.value = value
+    }
+}
+
+private final class InMemoryRuleStore: RuleStore {
+    private var ruleSet: RuleSet
+    private let lock = NSLock()
+
+    init(initial: RuleSet = RuleSet(version: 1, defaultBrowser: "com.apple.Safari", rules: [])) {
+        self.ruleSet = initial
+    }
+
+    func load() throws -> RuleSet {
+        lock.lock()
+        defer { lock.unlock() }
+        return ruleSet
+    }
+
+    func save(_ ruleSet: RuleSet) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        self.ruleSet = ruleSet
+    }
+}

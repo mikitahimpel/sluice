@@ -1,14 +1,17 @@
 import AppKit
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // URL routing wires up here in a later task.
+    let coordinator: AppCoordinator
+
+    override init() {
+        self.coordinator = MainActor.assumeIsolated { AppCoordinator.makeDefault() }
+        super.init()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        // Routed in a later task. For now, log so we can see we're being invoked.
-        for url in urls {
-            NSLog("Sluice received URL: %@", url.absoluteString)
+        MainActor.assumeIsolated {
+            coordinator.handle(urls: urls)
         }
     }
 }

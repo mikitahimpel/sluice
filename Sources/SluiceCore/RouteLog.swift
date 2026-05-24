@@ -6,19 +6,22 @@ public struct RouteEvent: Equatable {
     public let sourceBundleID: String?
     public let target: String
     public let matchedRuleID: UUID?
+    public let chromeProfile: String?
 
     public init(
         timestamp: Date,
         url: URL,
         sourceBundleID: String?,
         target: String,
-        matchedRuleID: UUID?
+        matchedRuleID: UUID?,
+        chromeProfile: String? = nil
     ) {
         self.timestamp = timestamp
         self.url = url
         self.sourceBundleID = sourceBundleID
         self.target = target
         self.matchedRuleID = matchedRuleID
+        self.chromeProfile = chromeProfile
     }
 }
 

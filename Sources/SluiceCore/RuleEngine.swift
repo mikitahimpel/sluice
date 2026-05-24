@@ -13,10 +13,12 @@ public struct RouteRequest: Equatable {
 public struct RouteDecision: Equatable {
     public var target: String
     public var matchedRule: Rule?
+    public var chromeProfile: String?
 
-    public init(target: String, matchedRule: Rule? = nil) {
+    public init(target: String, matchedRule: Rule? = nil, chromeProfile: String? = nil) {
         self.target = target
         self.matchedRule = matchedRule
+        self.chromeProfile = chromeProfile
     }
 }
 
@@ -24,10 +26,14 @@ public enum RuleEngine {
     public static func decide(_ request: RouteRequest, against ruleSet: RuleSet) -> RouteDecision {
         for rule in ruleSet.rules where rule.enabled {
             if matches(rule: rule, request: request) {
-                return RouteDecision(target: rule.target, matchedRule: rule)
+                return RouteDecision(
+                    target: rule.target,
+                    matchedRule: rule,
+                    chromeProfile: rule.chromeProfile
+                )
             }
         }
-        return RouteDecision(target: ruleSet.defaultBrowser, matchedRule: nil)
+        return RouteDecision(target: ruleSet.defaultBrowser, matchedRule: nil, chromeProfile: nil)
     }
 
     private static func matches(rule: Rule, request: RouteRequest) -> Bool {

@@ -12,6 +12,8 @@ struct RuleEditorSheet: View {
     @State private var sourceAppBundleID: String?
     @State private var urlHostGlob: String = ""
     @State private var targetBundleID: String?
+    @State private var chromeProfile: String?
+    @State private var chromeProfiles: [ChromeProfile] = []
     @State private var enabled: Bool = true
     @State private var didInit = false
 
@@ -51,6 +53,19 @@ struct RuleEditorSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Open in").font(.subheadline)
                 BrowserPicker(selection: $targetBundleID, browsers: browsers)
+
+                if targetBundleID == chromeBundleID {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Chrome profile").font(.subheadline)
+                        ChromeProfilePicker(selection: $chromeProfile, profiles: chromeProfiles)
+                    }
+                    .padding(.top, 6)
+                }
+            }
+            .onChange(of: targetBundleID) { newValue in
+                if newValue != chromeBundleID {
+                    chromeProfile = nil
+                }
             }
 
             Spacer()
@@ -65,7 +80,7 @@ struct RuleEditorSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 480, height: 360)
+        .frame(width: 480, height: 420)
         .onAppear(perform: hydrateIfNeeded)
     }
 
@@ -82,9 +97,13 @@ struct RuleEditorSheet: View {
     private func hydrateIfNeeded() {
         guard !didInit else { return }
         didInit = true
+        if chromeProfiles.isEmpty {
+            chromeProfiles = ChromeProfileCatalog().profiles()
+        }
         if let rule = initialRule {
             enabled = rule.enabled
             targetBundleID = rule.target
+            chromeProfile = rule.chromeProfile
             switch rule.match {
             case .sourceApp(let bundleID):
                 matchKind = .sourceApp
@@ -108,15 +127,19 @@ struct RuleEditorSheet: View {
             guard !trimmed.isEmpty else { return }
             match = .urlHost(glob: trimmed)
         }
+        let effectiveProfile = (target == chromeBundleID) ? chromeProfile : nil
         let saved = Rule(
             id: initialRule?.id ?? UUID(),
             enabled: initialRule?.enabled ?? enabled,
             match: match,
-            target: target
+            target: target,
+            chromeProfile: effectiveProfile
         )
         onSave(saved)
     }
 }
+
+private let chromeBundleID = "com.google.Chrome"
 
 private enum MatchKind: Hashable {
     case sourceApp

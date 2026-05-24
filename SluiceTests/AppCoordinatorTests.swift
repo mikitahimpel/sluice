@@ -40,15 +40,16 @@ private final class FakeOpener: URLOpening {
     struct Call: Equatable {
         let urls: [URL]
         let target: String
+        let chromeProfile: String?
     }
     var calls: [Call] = []
     var errorToThrow: Error?
 
-    func open(_ urls: [URL], with browserBundleID: String) throws {
+    func open(_ urls: [URL], with browserBundleID: String, chromeProfile: String?) throws {
         if let errorToThrow {
             throw errorToThrow
         }
-        calls.append(Call(urls: urls, target: browserBundleID))
+        calls.append(Call(urls: urls, target: browserBundleID, chromeProfile: chromeProfile))
     }
 }
 
@@ -93,8 +94,8 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.handle(urls: urls)
 
         XCTAssertEqual(opener.calls.count, 2)
-        XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [urls[0]], target: figmaDesktop))
-        XCTAssertEqual(opener.calls[1], FakeOpener.Call(urls: [urls[1]], target: safari))
+        XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [urls[0]], target: figmaDesktop, chromeProfile: nil))
+        XCTAssertEqual(opener.calls[1], FakeOpener.Call(urls: [urls[1]], target: safari, chromeProfile: nil))
     }
 
     func testUpdateRuleSetUpdatesPublishedAndSaves() {
@@ -159,7 +160,7 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.handle(urls: [wrapped])
 
         XCTAssertEqual(opener.calls.count, 1)
-        XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [underlying], target: figmaDesktop))
+        XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [underlying], target: figmaDesktop, chromeProfile: nil))
     }
 
     func testPreviewReturnsDecisionForConfiguredRuleSet() {

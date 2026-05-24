@@ -46,12 +46,20 @@ public struct Rule: Codable, Identifiable, Equatable {
     public var enabled: Bool
     public var match: Match
     public var target: String
+    public var chromeProfile: String?
 
-    public init(id: UUID = UUID(), enabled: Bool = true, match: Match, target: String) {
+    public init(
+        id: UUID = UUID(),
+        enabled: Bool = true,
+        match: Match,
+        target: String,
+        chromeProfile: String? = nil
+    ) {
         self.id = id
         self.enabled = enabled
         self.match = match
         self.target = target
+        self.chromeProfile = chromeProfile
     }
 }
 

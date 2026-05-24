@@ -56,12 +56,17 @@ public final class URLOpener: URLOpening {
         self.launcher = launcher
     }
 
-    public func open(_ urls: [URL], with browserBundleID: String) throws {
+    public func open(_ urls: [URL], with browserBundleID: String, chromeProfile: String?) throws {
         guard let appURL = resolver.urlForApplication(withBundleIdentifier: browserBundleID) else {
             throw URLOpenerError.browserNotInstalled(bundleID: browserBundleID)
         }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
+        // The flag is Chromium-family (Chrome, Brave, Edge); harmless to set on
+        // non-Chromium browsers since the UI only surfaces it for Chrome.
+        if let chromeProfile, !chromeProfile.isEmpty {
+            config.arguments = ["--profile-directory=\(chromeProfile)"]
+        }
         // v1: `throws` only covers synchronous resolution failure. The async launch result
         // is logged but not surfaced — wiring it back to the caller requires a richer
         // async/Result-returning API which we'll add when the UI layer needs it.

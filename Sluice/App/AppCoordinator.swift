@@ -78,7 +78,7 @@ public final class AppCoordinator: ObservableObject {
             onPick: { [weak self] bundleID in
                 guard let self else { return }
                 do {
-                    try self.opener.open(unwrapped, with: bundleID)
+                    try self.opener.open(unwrapped, with: bundleID, chromeProfile: nil)
                 } catch {
                     NSLog("AppCoordinator: override open failed: %@", String(describing: error))
                 }
@@ -89,7 +89,8 @@ public final class AppCoordinator: ObservableObject {
                         url: url,
                         sourceBundleID: source,
                         target: bundleID,
-                        matchedRuleID: nil
+                        matchedRuleID: nil,
+                        chromeProfile: nil
                     ))
                 }
                 self.activeOverridePicker = nil

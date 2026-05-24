@@ -5,6 +5,7 @@ struct RulesTab: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @State private var browsers: [AppInfo] = []
     @State private var apps: [AppInfo] = []
+    @State private var chromeProfiles: [ChromeProfile] = []
     @State private var editing: EditingTarget?
     @State private var testURLString: String = ""
     @State private var testSourceBundleID: String?
@@ -37,6 +38,7 @@ struct RulesTab: View {
         .onAppear {
             if browsers.isEmpty { browsers = coordinator.browserCatalog.installedBrowsers() }
             if apps.isEmpty { apps = coordinator.appCatalog.installedApps() }
+            if chromeProfiles.isEmpty { chromeProfiles = ChromeProfileCatalog().profiles() }
         }
         .sheet(item: $editing) { target in
             RuleEditorSheet(
@@ -73,6 +75,7 @@ struct RulesTab: View {
                         rule: rule,
                         apps: apps,
                         browsers: browsers,
+                        chromeProfiles: chromeProfiles,
                         onToggleEnabled: { newValue in
                             toggle(ruleID: rule.id, enabled: newValue)
                         },
@@ -253,6 +256,7 @@ private struct RuleRow: View {
     let rule: Rule
     let apps: [AppInfo]
     let browsers: [AppInfo]
+    let chromeProfiles: [ChromeProfile]
     let onToggleEnabled: (Bool) -> Void
     let onDelete: () -> Void
 
@@ -314,13 +318,19 @@ private struct RuleRow: View {
         if let browser = browsers.first(where: { $0.bundleID == rule.target }) {
             HStack(spacing: 6) {
                 AppIconView(app: browser, size: 16)
-                Text(browser.displayName)
+                Text(browser.displayName + profileSuffix)
             }
         } else {
             HStack(spacing: 6) {
                 AppIconView(app: nil, size: 16)
-                Text(rule.target).font(.system(.body, design: .monospaced))
+                Text(rule.target + profileSuffix).font(.system(.body, design: .monospaced))
             }
         }
+    }
+
+    private var profileSuffix: String {
+        guard let directory = rule.chromeProfile else { return "" }
+        let label = chromeProfiles.first(where: { $0.directory == directory })?.name ?? directory
+        return " (\(label))"
     }
 }

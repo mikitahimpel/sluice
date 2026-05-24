@@ -19,15 +19,16 @@ private final class FakeOpener: URLOpening {
     struct Call: Equatable {
         let urls: [URL]
         let target: String
+        let chromeProfile: String?
     }
     var calls: [Call] = []
     var errorToThrow: Error?
 
-    func open(_ urls: [URL], with browserBundleID: String) throws {
+    func open(_ urls: [URL], with browserBundleID: String, chromeProfile: String?) throws {
         if let errorToThrow {
             throw errorToThrow
         }
-        calls.append(Call(urls: urls, target: browserBundleID))
+        calls.append(Call(urls: urls, target: browserBundleID, chromeProfile: chromeProfile))
     }
 }
 
@@ -78,8 +79,33 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(opener.calls.count, 2)
         XCTAssertEqual(opener.calls[0].urls, [urls[0]])
         XCTAssertEqual(opener.calls[0].target, figmaDesktop)
+        XCTAssertNil(opener.calls[0].chromeProfile)
         XCTAssertEqual(opener.calls[1].urls, [urls[1]])
         XCTAssertEqual(opener.calls[1].target, safari)
+        XCTAssertNil(opener.calls[1].chromeProfile)
+    }
+
+    func testChromeProfileFromMatchedRuleIsPassedToOpener() throws {
+        let detector = FakeSourceDetector(source: nil)
+        let opener = FakeOpener()
+        let log = RouteLog()
+        let chromeRule = Rule(
+            match: .urlHost(glob: "*.example.com"),
+            target: chrome,
+            chromeProfile: "Profile 1"
+        )
+        let ruleSet = RuleSet(defaultBrowser: safari, rules: [chromeRule])
+        let router = Router(
+            ruleSetProvider: { ruleSet },
+            sourceDetector: detector,
+            opener: opener,
+            log: log
+        )
+        try router.route([URL(string: "https://www.example.com/x")!])
+        XCTAssertEqual(opener.calls.count, 1)
+        XCTAssertEqual(opener.calls[0].target, chrome)
+        XCTAssertEqual(opener.calls[0].chromeProfile, "Profile 1")
+        XCTAssertEqual(log.recent().first?.chromeProfile, "Profile 1")
     }
 
     func testMatchedRuleIDRecordedInLog() throws {

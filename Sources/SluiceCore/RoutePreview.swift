@@ -6,19 +6,22 @@ public struct RoutePreview: Equatable {
     public let sourceBundleID: String?
     public let target: String
     public let matchedRule: Rule?
+    public let chromeProfile: String?
 
     public init(
         originalURL: URL,
         unwrappedURL: URL,
         sourceBundleID: String?,
         target: String,
-        matchedRule: Rule?
+        matchedRule: Rule?,
+        chromeProfile: String? = nil
     ) {
         self.originalURL = originalURL
         self.unwrappedURL = unwrappedURL
         self.sourceBundleID = sourceBundleID
         self.target = target
         self.matchedRule = matchedRule
+        self.chromeProfile = chromeProfile
     }
 
     public var didUnwrap: Bool { originalURL != unwrappedURL }
@@ -47,7 +50,8 @@ public enum RoutePreviewer {
             unwrappedURL: unwrapped,
             sourceBundleID: sourceBundleID,
             target: decision.target,
-            matchedRule: decision.matchedRule
+            matchedRule: decision.matchedRule,
+            chromeProfile: decision.chromeProfile
         )
         return .success(preview)
     }

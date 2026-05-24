@@ -65,6 +65,34 @@ final class RuleCodableTests: XCTestCase {
         XCTAssertEqual(original, decoded)
     }
 
+    func testRuleWithChromeProfileRoundTrips() throws {
+        let original = Rule(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            enabled: true,
+            match: .urlHost(glob: "*.example.com"),
+            target: "com.google.Chrome",
+            chromeProfile: "Profile 1"
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Rule.self, from: data)
+        XCTAssertEqual(original, decoded)
+        XCTAssertEqual(decoded.chromeProfile, "Profile 1")
+    }
+
+    func testRuleDecodesFromOldFormatWithoutChromeProfileField() throws {
+        let json = """
+        {
+          "id": "33333333-3333-3333-3333-333333333333",
+          "enabled": true,
+          "match": {"type": "urlHost", "glob": "*.figma.com"},
+          "target": "com.figma.Desktop"
+        }
+        """
+        let decoded = try JSONDecoder().decode(Rule.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.target, "com.figma.Desktop")
+        XCTAssertNil(decoded.chromeProfile)
+    }
+
     func testRuleSetDecodesFromHandWrittenJSON() throws {
         let json = """
         {

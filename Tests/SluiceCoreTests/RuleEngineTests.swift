@@ -99,6 +99,28 @@ final class RuleEngineTests: XCTestCase {
         XCTAssertEqual(decision.matchedRule, sourceRule)
     }
 
+    func testDecisionCarriesChromeProfileFromMatchedRule() {
+        let rule = Rule(
+            match: .urlHost(glob: "*.example.com"),
+            target: chrome,
+            chromeProfile: "Profile 1"
+        )
+        let ruleSet = RuleSet(defaultBrowser: safari, rules: [rule])
+        let request = RouteRequest(url: URL(string: "https://www.example.com")!, sourceBundleID: nil)
+        let decision = RuleEngine.decide(request, against: ruleSet)
+        XCTAssertEqual(decision.target, chrome)
+        XCTAssertEqual(decision.chromeProfile, "Profile 1")
+    }
+
+    func testDefaultFallbackDecisionHasNilChromeProfile() {
+        let rule = Rule(match: .urlHost(glob: "*.figma.com"), target: chrome, chromeProfile: "Profile 1")
+        let ruleSet = RuleSet(defaultBrowser: safari, rules: [rule])
+        let request = RouteRequest(url: URL(string: "https://example.com")!, sourceBundleID: nil)
+        let decision = RuleEngine.decide(request, against: ruleSet)
+        XCTAssertEqual(decision.target, safari)
+        XCTAssertNil(decision.chromeProfile)
+    }
+
     func testURLWithoutHostUsesEmptyString() {
         let rule = Rule(match: .urlHost(glob: "*"), target: chrome)
         let ruleSet = RuleSet(defaultBrowser: safari, rules: [rule])

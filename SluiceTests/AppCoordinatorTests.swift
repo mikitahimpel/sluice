@@ -147,6 +147,21 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(opener.calls.isEmpty)
     }
 
+    func testHandleURLsUnwrapsWrappedURLBeforeRouting() {
+        let figmaRule = Rule(match: .urlHost(glob: "*.figma.com"), target: figmaDesktop)
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [figmaRule])
+        let store = FakeRuleStore(initial: initial)
+        let opener = FakeOpener()
+        let coordinator = makeCoordinator(store: store, opener: opener)
+
+        let wrapped = URL(string: "https://www.google.com/url?q=https%3A%2F%2Fwww.figma.com%2Ffile%2Fabc&sa=U")!
+        let underlying = URL(string: "https://www.figma.com/file/abc")!
+        coordinator.handle(urls: [wrapped])
+
+        XCTAssertEqual(opener.calls.count, 1)
+        XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [underlying], target: figmaDesktop))
+    }
+
     func testReloadRuleSetReadsFromStore() {
         let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
         let store = FakeRuleStore(initial: initial)

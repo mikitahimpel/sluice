@@ -52,8 +52,9 @@ public final class AppCoordinator: ObservableObject {
     }
 
     public func handle(urls: [URL]) {
+        let unwrapped = urls.map { LinkUnwrapper.unwrap($0) }
         do {
-            try router.route(urls)
+            try router.route(unwrapped)
         } catch {
             NSLog("AppCoordinator: routing failed: %@", String(describing: error))
         }

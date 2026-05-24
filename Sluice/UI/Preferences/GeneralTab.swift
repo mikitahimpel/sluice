@@ -1,10 +1,14 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 import SluiceCore
 
 struct GeneralTab: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @State private var browsers: [AppInfo] = []
     @State private var refreshTick: Int = 0
+    @State private var pendingImportURL: URL?
+    @State private var backupErrorMessage: String?
 
     var body: some View {
         Form {
@@ -40,6 +44,16 @@ struct GeneralTab: View {
                 }
                 .labelsHidden()
             }
+
+            Section("Backup") {
+                HStack {
+                    Button("Import rules…", action: presentImportPanel)
+                    Button("Export rules…", action: presentExportPanel)
+                }
+                Text("Export to share or back up your rules. Importing replaces all current rules.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -48,6 +62,68 @@ struct GeneralTab: View {
             }
         }
         .id(refreshTick)
+        .alert(
+            "Replace current rules?",
+            isPresented: Binding(
+                get: { pendingImportURL != nil },
+                set: { if !$0 { pendingImportURL = nil } }
+            ),
+            presenting: pendingImportURL
+        ) { url in
+            Button("Replace", role: .destructive) {
+                performImport(from: url)
+                pendingImportURL = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingImportURL = nil
+            }
+        } message: { _ in
+            Text("This will replace your current rules with the imported set.")
+        }
+        .alert(
+            "Backup failed",
+            isPresented: Binding(
+                get: { backupErrorMessage != nil },
+                set: { if !$0 { backupErrorMessage = nil } }
+            ),
+            presenting: backupErrorMessage
+        ) { _ in
+            Button("OK", role: .cancel) { backupErrorMessage = nil }
+        } message: { message in
+            Text(message)
+        }
+    }
+
+    private func presentImportPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.prompt = "Import"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        pendingImportURL = url
+    }
+
+    private func presentExportPanel() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "sluice-rules.json"
+        panel.prompt = "Export"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try coordinator.exportRuleSet(to: url)
+        } catch {
+            backupErrorMessage = "Could not export rules: \(error.localizedDescription)"
+        }
+    }
+
+    private func performImport(from url: URL) {
+        do {
+            try coordinator.importRuleSet(from: url)
+        } catch {
+            backupErrorMessage = "Could not import rules: \(error.localizedDescription)"
+        }
     }
 
     private var isSluiceDefault: Bool {

@@ -162,6 +162,128 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(opener.calls[0], FakeOpener.Call(urls: [underlying], target: figmaDesktop))
     }
 
+    func testPreviewReturnsDecisionForConfiguredRuleSet() {
+        let figmaRule = Rule(match: .urlHost(glob: "*.figma.com"), target: figmaDesktop)
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [figmaRule])
+        let store = FakeRuleStore(initial: initial)
+        let coordinator = makeCoordinator(store: store)
+
+        let matched = coordinator.preview(urlString: "https://www.figma.com/file/abc", sourceBundleID: nil)
+        guard case let .success(preview) = matched else {
+            XCTFail("expected success, got \(matched)")
+            return
+        }
+        XCTAssertEqual(preview.target, figmaDesktop)
+        XCTAssertEqual(preview.matchedRule, figmaRule)
+
+        let fallback = coordinator.preview(urlString: "https://example.com", sourceBundleID: nil)
+        guard case let .success(fallbackPreview) = fallback else {
+            XCTFail("expected success, got \(fallback)")
+            return
+        }
+        XCTAssertEqual(fallbackPreview.target, safari)
+        XCTAssertNil(fallbackPreview.matchedRule)
+
+        let invalid = coordinator.preview(urlString: "not a url", sourceBundleID: nil)
+        XCTAssertEqual(invalid, .failure(.invalidURL))
+    }
+
+    func testExportRuleSetWritesParseableJSON() throws {
+        let figmaRule = Rule(match: .urlHost(glob: "*.figma.com"), target: figmaDesktop)
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [figmaRule])
+        let store = FakeRuleStore(initial: initial)
+        let coordinator = makeCoordinator(store: store)
+
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sluice-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        let outURL = tmpDir.appendingPathComponent("rules.json")
+
+        try coordinator.exportRuleSet(to: outURL)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outURL.path))
+        let data = try Data(contentsOf: outURL)
+        let decoded = try JSONDecoder().decode(RuleSet.self, from: data)
+        XCTAssertEqual(decoded, initial)
+
+        // Verify it's valid JSON object
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        XCTAssertTrue(json is [String: Any])
+    }
+
+    func testImportRuleSetUpdatesAndPersists() throws {
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
+        let store = FakeRuleStore(initial: initial)
+        let coordinator = makeCoordinator(store: store)
+
+        let imported = RuleSet(version: 1, defaultBrowser: chrome, rules: [
+            Rule(match: .urlHost(glob: "*.example.com"), target: chrome)
+        ])
+
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sluice-import-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        let inURL = tmpDir.appendingPathComponent("rules.json")
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(imported).write(to: inURL, options: .atomic)
+
+        let saveCountBefore = store.saveCallCount
+        try coordinator.importRuleSet(from: inURL)
+
+        XCTAssertEqual(coordinator.ruleSet, imported)
+        XCTAssertEqual(store.saveCallCount, saveCountBefore + 1)
+        XCTAssertEqual(store.lastSaved, imported)
+    }
+
+    func testImportRuleSetFromMalformedFileThrowsAndLeavesStateUnchanged() throws {
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [
+            Rule(match: .urlHost(glob: "*.figma.com"), target: figmaDesktop)
+        ])
+        let store = FakeRuleStore(initial: initial)
+        let coordinator = makeCoordinator(store: store)
+        let saveCountBefore = store.saveCallCount
+
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sluice-import-bad-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        let badURL = tmpDir.appendingPathComponent("rules.json")
+        try Data("{ not json".utf8).write(to: badURL, options: .atomic)
+
+        XCTAssertThrowsError(try coordinator.importRuleSet(from: badURL))
+        XCTAssertEqual(coordinator.ruleSet, initial)
+        XCTAssertEqual(store.saveCallCount, saveCountBefore)
+    }
+
+    func testImportRuleSetWithInvalidVersionThrowsAndLeavesStateUnchanged() throws {
+        let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
+        let store = FakeRuleStore(initial: initial)
+        let coordinator = makeCoordinator(store: store)
+        let saveCountBefore = store.saveCallCount
+
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sluice-import-ver-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        let badURL = tmpDir.appendingPathComponent("rules.json")
+        let bad = #"{"version":99,"defaultBrowser":"com.apple.Safari","rules":[]}"#
+        try Data(bad.utf8).write(to: badURL, options: .atomic)
+
+        XCTAssertThrowsError(try coordinator.importRuleSet(from: badURL)) { error in
+            guard case RuleStoreError.invalidVersion(let v) = error else {
+                XCTFail("expected invalidVersion, got \(error)")
+                return
+            }
+            XCTAssertEqual(v, 99)
+        }
+        XCTAssertEqual(coordinator.ruleSet, initial)
+        XCTAssertEqual(store.saveCallCount, saveCountBefore)
+    }
+
     func testReloadRuleSetReadsFromStore() {
         let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
         let store = FakeRuleStore(initial: initial)

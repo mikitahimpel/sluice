@@ -6,6 +6,9 @@ struct RulesTab: View {
     @State private var browsers: [AppInfo] = []
     @State private var apps: [AppInfo] = []
     @State private var editing: EditingTarget?
+    @State private var testURLString: String = ""
+    @State private var testSourceBundleID: String?
+    @State private var testResult: Result<RoutePreview, RoutePreviewError>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,6 +28,11 @@ struct RulesTab: View {
                 Spacer()
             }
             .padding(8)
+
+            Divider()
+
+            testURLSection
+                .padding(8)
         }
         .onAppear {
             if browsers.isEmpty { browsers = coordinator.browserCatalog.installedBrowsers() }
@@ -122,6 +130,110 @@ struct RulesTab: View {
         var updated = coordinator.ruleSet
         updated.rules.move(fromOffsets: source, toOffset: destination)
         coordinator.updateRuleSet(updated)
+    }
+
+    private var testURLSection: some View {
+        GroupBox("Test a URL") {
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("https://example.com/...", text: $testURLString, onCommit: runTest)
+                    .textFieldStyle(.roundedBorder)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        AppPicker(
+                            selection: $testSourceBundleID,
+                            apps: apps,
+                            placeholder: "(any/no source)"
+                        )
+                        if testSourceBundleID != nil {
+                            Button {
+                                testSourceBundleID = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Clear source app")
+                        }
+                    }
+                    Text("Source app (optional)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Button("Test", action: runTest)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(testURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Spacer()
+                }
+
+                if let result = testResult {
+                    testResultView(result)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func testResultView(_ result: Result<RoutePreview, RoutePreviewError>) -> some View {
+        switch result {
+        case .failure(.invalidURL):
+            Text("Invalid URL. Include a scheme (e.g. https://).")
+                .foregroundStyle(.red)
+                .font(.callout)
+        case .success(let preview):
+            VStack(alignment: .leading, spacing: 4) {
+                if preview.didUnwrap {
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("Unwrapped to:").foregroundStyle(.secondary)
+                        Text(preview.unwrappedURL.absoluteString)
+                            .font(.system(.callout, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                }
+                HStack(spacing: 4) {
+                    Text("Matched:").foregroundStyle(.secondary)
+                    Text(matchedSummary(for: preview.matchedRule))
+                        .fontWeight(.bold)
+                }
+                HStack(spacing: 6) {
+                    Text("→ Opens in:").foregroundStyle(.secondary)
+                    let browser = browsers.first(where: { $0.bundleID == preview.target })
+                    AppIconView(app: browser, size: 16)
+                    Text(browserDisplayName(for: preview.target))
+                }
+            }
+            .font(.callout)
+        }
+    }
+
+    private func runTest() {
+        let trimmed = testURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            testResult = nil
+            return
+        }
+        testResult = coordinator.preview(
+            urlString: testURLString,
+            sourceBundleID: testSourceBundleID
+        )
+    }
+
+    private func matchedSummary(for rule: Rule?) -> String {
+        guard let rule else { return "default fallback" }
+        switch rule.match {
+        case .sourceApp(let bundleID):
+            let name = apps.first(where: { $0.bundleID == bundleID })?.displayName ?? bundleID
+            return "source app = \(name)"
+        case .urlHost(let glob):
+            return "URL host matches \(glob)"
+        }
+    }
+
+    private func browserDisplayName(for bundleID: String) -> String {
+        browsers.first(where: { $0.bundleID == bundleID })?.displayName ?? bundleID
     }
 }
 

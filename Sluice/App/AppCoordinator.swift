@@ -77,6 +77,35 @@ public final class AppCoordinator: ObservableObject {
         }
     }
 
+    public func preview(urlString: String, sourceBundleID: String?) -> Result<RoutePreview, RoutePreviewError> {
+        RoutePreviewer.preview(
+            urlString: urlString,
+            sourceBundleID: sourceBundleID,
+            ruleSet: ruleSet
+        )
+    }
+
+    public func exportRuleSet(to fileURL: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(ruleSet)
+        try data.write(to: fileURL, options: .atomic)
+    }
+
+    public func importRuleSet(from fileURL: URL) throws {
+        let data = try Data(contentsOf: fileURL)
+        let decoded: RuleSet
+        do {
+            decoded = try JSONDecoder().decode(RuleSet.self, from: data)
+        } catch {
+            throw RuleStoreError.malformedConfig(underlying: error)
+        }
+        guard decoded.version == 1 else {
+            throw RuleStoreError.invalidVersion(decoded.version)
+        }
+        updateRuleSet(decoded)
+    }
+
     public static func makeDefault() -> AppCoordinator {
         let store: RuleStore
         do {

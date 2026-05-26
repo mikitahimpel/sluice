@@ -1,6 +1,6 @@
 name: Sluice
 options:
-  bundleIdPrefix: com.gimpel
+  bundleIdPrefix: com.mikitahimpel
   deploymentTarget:
     macOS: "13.0"
   developmentLanguage: en
@@ -45,7 +45,7 @@ targets:
             LSHandlerRank: Default
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.gimpel.Sluice
+        PRODUCT_BUNDLE_IDENTIFIER: com.mikitahimpel.sluice
         PRODUCT_NAME: Sluice
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -68,5 +68,5 @@ targets:
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Sluice.app/Contents/MacOS/Sluice"
-        PRODUCT_BUNDLE_IDENTIFIER: com.gimpel.SluiceTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.mikitahimpel.sluice.tests
         GENERATE_INFOPLIST_FILE: YES

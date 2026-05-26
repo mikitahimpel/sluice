@@ -59,18 +59,13 @@ private struct StatusRow: View {
 
 private struct OpenPreferencesButton: View {
     var body: some View {
-        if #available(macOS 14.0, *) {
-            SettingsLink {
-                Text("Open Preferences…")
-            }
-            .keyboardShortcut(",")
-        } else {
-            Button("Open Preferences…") {
-                // Modern selector targeting AppKit's settings window on macOS 13.
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-            .keyboardShortcut(",")
+        Button("Open Preferences…") {
+            // LSUIElement apps don't activate themselves when a panel is requested;
+            // without this the Settings window opens off-screen / behind everything.
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         }
+        .keyboardShortcut(",")
     }
 }
 

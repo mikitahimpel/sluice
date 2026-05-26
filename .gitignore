@@ -20,3 +20,6 @@ Package.resolved
 
 # Logs
 *.log
+
+# Release artifacts (binaries live on GitHub Releases, not in the repo)
+release-artifacts/

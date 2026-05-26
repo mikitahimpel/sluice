@@ -25,16 +25,17 @@ fi
 
 echo "==> Looking up latest Sluice release"
 LATEST_URL="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep -oE '"browser_download_url":\s*"[^"]+\.zip"' \
+  | grep '"browser_download_url"' \
+  | grep '\.zip"' \
   | head -1 \
-  | sed 's/.*"browser_download_url":\s*"\([^"]*\)".*/\1/')"
+  | cut -d'"' -f4)"
 
 if [[ -z "${LATEST_URL}" ]]; then
   echo "Could not find a release zip on GitHub. Check https://github.com/${REPO}/releases" >&2
   exit 1
 fi
 
-VERSION="$(echo "$LATEST_URL" | sed -E 's|.*/v?([^/]+)/Sluice.*\.zip|\1|')"
+VERSION="$(echo "$LATEST_URL" | sed -E 's|.*/v?([^/]+)/Sluice-[^/]+\.zip$|\1|')"
 echo "    Found: ${VERSION}"
 
 TMP_DIR="$(mktemp -d)"

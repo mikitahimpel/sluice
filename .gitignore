@@ -23,3 +23,6 @@ Package.resolved
 
 # Release artifacts (binaries live on GitHub Releases, not in the repo)
 release-artifacts/
+
+# Sibling repo for the Homebrew tap, cloned here for convenience
+homebrew-sluice/

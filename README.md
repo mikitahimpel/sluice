@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/mikitahimpel/sluice/main/install.sh
 
 After installing: System Settings → Default web browser → Sluice. Then add routing rules from the menu bar icon.
 
-Requires macOS 13 (Ventura) or later. Builds are notarized by Apple, so Gatekeeper accepts them without warnings.
+Requires macOS 14 (Sonoma) or later. Builds are notarized by Apple, so Gatekeeper accepts them without warnings.
 
 ## Features (v1)
 

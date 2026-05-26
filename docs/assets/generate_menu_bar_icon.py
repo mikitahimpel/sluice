@@ -23,31 +23,26 @@ ICONSET = os.path.normpath(
     os.path.join(HERE, "..", "..", "Sluice", "App", "Assets.xcassets", "MenuBarIcon.imageset")
 )
 
-BAR_LENGTH = int(SS * 0.36)
-BAR_THICK = int(SS * 0.13)
+BAR_LENGTH = int(SS * 0.42)
+BAR_THICK = int(SS * 0.085)
 TILT_DEG = 22.0
-CASCADE_STEP = int(SS * 0.22)
-
-
-def rotated_rect(cx: float, cy: float, length: int, thickness: int, angle_deg: float) -> list[tuple[float, float]]:
-    a = math.radians(angle_deg)
-    dx, dy = math.cos(a) * length / 2, math.sin(a) * length / 2
-    px, py = -math.sin(a) * thickness / 2, math.cos(a) * thickness / 2
-    return [
-        (cx - dx - px, cy - dy - py),
-        (cx + dx - px, cy + dy - py),
-        (cx + dx + px, cy + dy + py),
-        (cx - dx + px, cy - dy + py),
-    ]
+CASCADE_STEP = int(SS * 0.23)
 
 
 def build_mark(draw: ImageDraw.ImageDraw) -> None:
     cx0, cy0 = SS / 2, SS / 2
     step_x = math.cos(math.radians(TILT_DEG + 90)) * CASCADE_STEP
     step_y = math.sin(math.radians(TILT_DEG + 90)) * CASCADE_STEP
+    a = math.radians(TILT_DEG)
+    dx, dy = math.cos(a) * BAR_LENGTH / 2, math.sin(a) * BAR_LENGTH / 2
+    r = BAR_THICK // 2
     for i in (-1, 0, 1):
         cx, cy = cx0 + step_x * i * 0.6, cy0 + step_y * i
-        draw.polygon(rotated_rect(cx, cy, BAR_LENGTH, BAR_THICK, TILT_DEG), fill=(0, 0, 0, 255))
+        x1, y1 = cx - dx, cy - dy
+        x2, y2 = cx + dx, cy + dy
+        draw.line([(x1, y1), (x2, y2)], fill=(0, 0, 0, 255), width=BAR_THICK)
+        draw.ellipse([x1 - r, y1 - r, x1 + r, y1 + r], fill=(0, 0, 0, 255))
+        draw.ellipse([x2 - r, y2 - r, x2 + r, y2 + r], fill=(0, 0, 0, 255))
 
 
 def main() -> None:

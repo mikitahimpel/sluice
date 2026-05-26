@@ -58,12 +58,14 @@ private struct StatusRow: View {
 }
 
 private struct OpenPreferencesButton: View {
+    @Environment(\.openSettings) private var openSettings
+
     var body: some View {
         Button("Open Preferences…") {
-            // LSUIElement apps don't activate themselves when a panel is requested;
-            // without this the Settings window opens off-screen / behind everything.
+            // LSUIElement + SwiftUI MenuBarExtra needs an explicit activate before
+            // openSettings, otherwise the window appears behind the active app.
             NSApp.activate(ignoringOtherApps: true)
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            openSettings()
         }
         .keyboardShortcut(",")
     }

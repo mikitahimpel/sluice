@@ -30,8 +30,8 @@ targets:
         LSUIElement: true
         LSMinimumSystemVersion: "13.0"
         CFBundleDisplayName: Sluice
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.1.1"
+        CFBundleVersion: "2"
         LSApplicationCategoryType: public.app-category.utilities
         NSHumanReadableCopyright: "Copyright © 2026 Mikita Himpel"
         CFBundleURLTypes:
@@ -43,12 +43,17 @@ targets:
             CFBundleURLSchemes: [https]
             CFBundleTypeRole: Viewer
             LSHandlerRank: Default
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: HTML document
+            CFBundleTypeRole: Viewer
+            LSItemContentTypes: [public.html, public.xhtml]
+            LSHandlerRank: Alternate
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mikitahimpel.sluice
         PRODUCT_NAME: Sluice
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.1"
+        CURRENT_PROJECT_VERSION: "2"
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
         DEVELOPMENT_TEAM: ""

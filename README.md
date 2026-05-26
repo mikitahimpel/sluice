@@ -4,6 +4,26 @@ A macOS URL router that opens links from different source apps in different brow
 
 **Use case:** "When I click a link in Conductor, open it in Chrome. Everything else — Safari."
 
+## Install
+
+**Homebrew (recommended):**
+
+```sh
+brew install --cask mikitahimpel/sluice/sluice
+```
+
+**One-line installer:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mikitahimpel/sluice/main/install.sh | bash
+```
+
+**Manual:** download the latest [release zip](https://github.com/mikitahimpel/sluice/releases/latest), unzip, drag into `/Applications`.
+
+After installing: System Settings → Default web browser → Sluice. Then add routing rules from the menu bar icon.
+
+Requires macOS 13 (Ventura) or later. Builds are notarized by Apple, so Gatekeeper accepts them without warnings.
+
 ## Features (v1)
 
 - Register as system default browser
@@ -54,6 +74,16 @@ xcodebuild test -scheme Sluice -destination 'platform=macOS'
 - `Sluice/Discovery/` — Launch Services / NSWorkspace wrappers.
 - `Sluice/System/` — default-browser registration, URL opening.
 - `Sluice/UI/` — SwiftUI menu bar + preferences.
+
+## Releasing
+
+`scripts/release.sh <version>` does the whole pipeline: builds Release, signs with Developer ID, submits to Apple's notary service, staples the ticket, and writes the final zip to `release-artifacts/`. Then:
+
+```sh
+gh release create v<version> release-artifacts/Sluice-<version>.zip
+```
+
+The Homebrew Cask formula lives in [mikitahimpel/homebrew-sluice](https://github.com/mikitahimpel/homebrew-sluice) — update its `version` and `sha256` after each release.
 
 ## License
 

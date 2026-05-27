@@ -6,21 +6,20 @@ struct MenuBarContent: View {
     @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
-        let resolver = BrowserDisplayNameResolver(catalog: coordinator.browserCatalog)
-        let isSluiceDefault = coordinator.defaultBrowserClient.isSluiceDefault()
+        let resolver = coordinator.browserResolver
+        let isSluiceDefault = coordinator.isSluiceDefault
+        let ruleCount = coordinator.ruleSet.rules.filter(\.enabled).count
 
-        StatusRow(
-            coordinator: coordinator,
-            resolver: resolver,
-            isSluiceDefault: isSluiceDefault
-        )
+        if isSluiceDefault {
+            Text(activeHeaderText(ruleCount: ruleCount))
+                .font(.system(size: 12))
+        } else {
+            Button("⚠ Set Sluice as default browser") {
+                coordinator.defaultBrowserClient.requestBecomeDefault()
+            }
+        }
 
         Divider()
-
-        Button("Set as default browser") {
-            coordinator.defaultBrowserClient.requestBecomeDefault()
-        }
-        .disabled(isSluiceDefault)
 
         OpenPreferencesButton()
 
@@ -35,25 +34,13 @@ struct MenuBarContent: View {
         }
         .keyboardShortcut("q")
     }
-}
 
-private struct StatusRow: View {
-    let coordinator: AppCoordinator
-    let resolver: BrowserDisplayNameResolver
-    let isSluiceDefault: Bool
-
-    var body: some View {
-        Text(statusText)
-    }
-
-    private var statusText: String {
-        if isSluiceDefault {
-            return "Default browser: Sluice ✓"
+    private func activeHeaderText(ruleCount: Int) -> String {
+        switch ruleCount {
+        case 0: return "Routing — no rules yet"
+        case 1: return "Routing through 1 rule"
+        default: return "Routing through \(ruleCount) rules"
         }
-        if let bundleID = coordinator.defaultBrowserClient.currentDefaultBrowser() {
-            return "Default browser: \(resolver.displayName(for: bundleID))"
-        }
-        return "Default browser: unknown"
     }
 }
 
@@ -61,9 +48,9 @@ private struct OpenPreferencesButton: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Button("Open Preferences…") {
-            // LSUIElement + SwiftUI MenuBarExtra needs an explicit activate before
-            // openSettings, otherwise the window appears behind the active app.
+        Button("Preferences…") {
+            // LSUIElement apps must explicitly activate before openSettings,
+            // otherwise the Settings window opens behind the active app.
             NSApp.activate(ignoringOtherApps: true)
             openSettings()
         }
@@ -79,7 +66,7 @@ private struct RecentRoutesMenu: View {
         Menu("Recent routes") {
             let events = Array(coordinator.routeLog.recent().prefix(10))
             if events.isEmpty {
-                Button("No routes yet") {}.disabled(true)
+                Button("No links routed yet") {}.disabled(true)
             } else {
                 ForEach(Array(events.enumerated()), id: \.offset) { _, event in
                     Text(label(for: event))
@@ -89,9 +76,9 @@ private struct RecentRoutesMenu: View {
     }
 
     private func label(for event: RouteEvent) -> String {
-        let left = event.url.host ?? truncate(event.url.absoluteString, to: 40)
+        let left = event.url.host ?? truncate(event.url.absoluteString, to: 36)
         let right = resolver.displayName(for: event.target)
-        return "\(left) → \(right)"
+        return "\(left)  →  \(right)"
     }
 
     private func truncate(_ s: String, to limit: Int) -> String {

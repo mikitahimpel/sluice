@@ -123,7 +123,7 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.ruleSet.rules.isEmpty)
     }
 
-    func testFailingSaveDoesNotThrowAndKeepsInMemoryUpdate() {
+    func testFailingSaveDoesNotThrowAndKeepsInMemoryInSyncWithDisk() {
         let initial = RuleSet(version: 1, defaultBrowser: safari, rules: [])
         let store = FakeRuleStore(initial: initial)
         struct SaveError: Error {}
@@ -133,7 +133,10 @@ final class AppCoordinatorTests: XCTestCase {
         let updated = RuleSet(version: 1, defaultBrowser: chrome, rules: [])
         coordinator.updateRuleSet(updated)
 
-        XCTAssertEqual(coordinator.ruleSet, updated)
+        // Invariant: memory and disk must not diverge. If the save fails the
+        // @Published stays at its prior value so the UI reflects what's on
+        // disk; export-after-failed-save can't leak unsaved data.
+        XCTAssertEqual(coordinator.ruleSet, initial)
         XCTAssertEqual(store.saveCallCount, 1)
     }
 

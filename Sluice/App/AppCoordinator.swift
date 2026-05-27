@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import SwiftUI
 import SluiceCore
 
@@ -7,10 +8,17 @@ public final class AppCoordinator: ObservableObject {
     @Published public private(set) var ruleSet: RuleSet {
         didSet { ruleSetBox.value = ruleSet }
     }
+    @Published public private(set) var installedBrowsers: [AppInfo] = []
+    @Published public private(set) var installedApps: [AppInfo] = []
+    @Published public private(set) var chromeProfiles: [ChromeProfile] = []
+    @Published public private(set) var isSluiceDefault: Bool = false
     public let routeLog: RouteLog
     public let browserCatalog: BrowserCatalog
     public let appCatalog: AppCatalog
     public let defaultBrowserClient: DefaultBrowserClient
+    lazy var browserResolver: BrowserDisplayNameResolver
+        = BrowserDisplayNameResolver(catalog: browserCatalog)
+    private let chromeProfileCatalog: ChromeProfileCatalog
     private let ruleStore: RuleStore
     private let router: Router
     private let sourceDetector: SourceDetecting
@@ -18,6 +26,7 @@ public final class AppCoordinator: ObservableObject {
     // Indirection so Router's escaping closure can read the latest RuleSet
     // without capturing `self` (avoids retain cycle and init-order issues).
     private let ruleSetBox: RuleSetBox
+    private var defaultBrowserObservers: [NSObjectProtocol] = []
 
     @Published var activeOverridePicker: OverridePickerWindowController?
 
@@ -28,6 +37,7 @@ public final class AppCoordinator: ObservableObject {
         browserCatalog: BrowserCatalog = BrowserCatalog(),
         appCatalog: AppCatalog = AppCatalog(),
         defaultBrowserClient: DefaultBrowserClient = DefaultBrowserClient(),
+        chromeProfileCatalog: ChromeProfileCatalog = ChromeProfileCatalog(),
         routeLog: RouteLog = RouteLog()
     ) {
         self.ruleStore = ruleStore
@@ -36,6 +46,7 @@ public final class AppCoordinator: ObservableObject {
         self.browserCatalog = browserCatalog
         self.appCatalog = appCatalog
         self.defaultBrowserClient = defaultBrowserClient
+        self.chromeProfileCatalog = chromeProfileCatalog
         self.routeLog = routeLog
 
         let loaded: RuleSet
@@ -43,7 +54,7 @@ public final class AppCoordinator: ObservableObject {
             loaded = try ruleStore.load()
         } catch {
             NSLog("AppCoordinator: failed to load RuleSet, using default: %@", String(describing: error))
-            loaded = RuleSet(version: 1, defaultBrowser: "com.apple.Safari", rules: [])
+            loaded = RuleSet(version: 1, defaultBrowser: BundleID.safari, rules: [])
         }
         let box = RuleSetBox(value: loaded)
         self.ruleSetBox = box
@@ -55,6 +66,38 @@ public final class AppCoordinator: ObservableObject {
             opener: opener,
             log: routeLog
         )
+
+        self.installedBrowsers = browserCatalog.installedBrowsers()
+        self.installedApps = appCatalog.installedApps()
+        self.chromeProfiles = chromeProfileCatalog.profiles()
+        self.isSluiceDefault = defaultBrowserClient.isSluiceDefault()
+
+        subscribeToDefaultBrowserChanges()
+    }
+
+    private func subscribeToDefaultBrowserChanges() {
+        let dist = DistributedNotificationCenter.default()
+        defaultBrowserObservers.append(dist.addObserver(
+            forName: Notification.Name("com.apple.LaunchServices.databaseChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshIsSluiceDefault() }
+        })
+
+        let local = NotificationCenter.default
+        defaultBrowserObservers.append(local.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshIsSluiceDefault() }
+        })
+    }
+
+    private func refreshIsSluiceDefault() {
+        let next = defaultBrowserClient.isSluiceDefault()
+        if next != isSluiceDefault { isSluiceDefault = next }
     }
 
     public func handle(urls: [URL]) {
@@ -104,12 +147,16 @@ public final class AppCoordinator: ObservableObject {
     }
 
     public func updateRuleSet(_ newRuleSet: RuleSet) {
-        ruleSet = newRuleSet
+        // Save before assigning so memory and disk can't diverge. If save
+        // throws, the @Published stays at its previous value and the UI
+        // reflects what's actually on disk.
         do {
             try ruleStore.save(newRuleSet)
         } catch {
             NSLog("AppCoordinator: failed to save RuleSet: %@", String(describing: error))
+            return
         }
+        ruleSet = newRuleSet
     }
 
     public func reloadRuleSet() {
@@ -146,7 +193,11 @@ public final class AppCoordinator: ObservableObject {
         guard decoded.version == 1 else {
             throw RuleStoreError.invalidVersion(decoded.version)
         }
-        updateRuleSet(decoded)
+        // Save via the store directly so a write failure propagates to the
+        // import sheet. `updateRuleSet` swallows save errors (acceptable for
+        // ambient UI edits) — for import, the user is waiting for an answer.
+        try ruleStore.save(decoded)
+        ruleSet = decoded
     }
 
     public static func makeDefault() -> AppCoordinator {
@@ -176,7 +227,7 @@ private final class InMemoryRuleStore: RuleStore {
     private var ruleSet: RuleSet
     private let lock = NSLock()
 
-    init(initial: RuleSet = RuleSet(version: 1, defaultBrowser: "com.apple.Safari", rules: [])) {
+    init(initial: RuleSet = RuleSet(version: 1, defaultBrowser: BundleID.safari, rules: [])) {
         self.ruleSet = initial
     }
 

@@ -11,5 +11,7 @@ struct SluiceApp: App {
             PreferencesWindow()
                 .environmentObject(appDelegate.coordinator)
         }
+        // Hidden titlebar lets the sidebar's material reach the window edge.
+        .windowStyle(.hiddenTitleBar)
     }
 }

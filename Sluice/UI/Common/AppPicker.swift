@@ -1,50 +1,54 @@
 import SwiftUI
 import SluiceCore
 
+/// Compact app picker that reveals a `PaletteList` in a popover. Use
+/// `AppPalette` / `BrowserPalette` directly for the full-height embedded form.
 struct AppPicker: View {
     @Binding var selection: String?
     let apps: [AppInfo]
     var placeholder: String = "Select an app…"
 
     @State private var isPresented = false
-    @State private var query: String = ""
 
     var body: some View {
         Button {
             isPresented = true
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: DS.Space.s) {
+                AppIconView(app: selectedApp, size: 18)
                 if let app = selectedApp {
-                    AppIconView(app: app, size: 24)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(app.displayName)
-                        Text(app.bundleID)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(app.displayName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary)
                 } else {
-                    AppIconView(app: nil, size: 24)
-                    Text(placeholder).foregroundStyle(.secondary)
+                    Text(placeholder)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
-                Spacer()
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Spacer(minLength: DS.Space.s)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, DS.Space.m)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DS.Radius.surface, style: .continuous)
+                    .fill(DS.SurfaceFill.card)
+            )
+            .hairline()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
-            AppPickerList(
+            AppPalette(
                 apps: apps,
                 selection: $selection,
-                query: $query,
-                dismiss: { isPresented = false }
+                onCommit: { isPresented = false }
             )
-            .frame(width: 320, height: 360)
+            .frame(width: 320, height: 320)
+            .padding(DS.Space.s)
         }
     }
 
@@ -54,52 +58,87 @@ struct AppPicker: View {
     }
 }
 
-private struct AppPickerList: View {
+/// Full-bleed embedded app palette — search field + scrollable rows.
+struct AppPalette: View {
     let apps: [AppInfo]
     @Binding var selection: String?
-    @Binding var query: String
-    let dismiss: () -> Void
+    var placeholder: String = "Search apps"
+    var height: CGFloat = 240
+    var initialFocus: Bool = false
+    var onCommit: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search", text: $query)
-                    .textFieldStyle(.plain)
-            }
-            .padding(8)
-            Divider()
-            if filtered.isEmpty {
-                VStack {
-                    Spacer()
-                    Text("No apps found").foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                List(filtered, selection: $selection) { app in
-                    Button {
-                        selection = app.bundleID
-                        dismiss()
-                    } label: {
-                        AppRow(app: app)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .tag(app.bundleID as String?)
-                }
-                .listStyle(.plain)
-            }
-        }
+        PaletteList(
+            items: apps,
+            filter: { app, q in
+                app.displayName.localizedCaseInsensitiveContains(q)
+                    || app.bundleID.localizedCaseInsensitiveContains(q)
+            },
+            selection: $selection,
+            row: { app, isSelected in
+                AppPaletteRow(app: app, isSelected: isSelected)
+            },
+            placeholder: placeholder,
+            emptyTitle: "No apps match",
+            emptySubtitle: "Search by display name or bundle ID.",
+            initialFocus: initialFocus,
+            height: height,
+            onCommit: { _ in onCommit?() }
+        )
     }
+}
 
-    private var filtered: [AppInfo] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return apps }
-        return apps.filter {
-            $0.displayName.localizedCaseInsensitiveContains(trimmed)
-                || $0.bundleID.localizedCaseInsensitiveContains(trimmed)
+struct BrowserPalette: View {
+    let browsers: [AppInfo]
+    @Binding var selection: String?
+    var height: CGFloat = 240
+    var initialFocus: Bool = false
+    var onCommit: (() -> Void)? = nil
+
+    var body: some View {
+        PaletteList(
+            items: browsers,
+            filter: { app, q in
+                app.displayName.localizedCaseInsensitiveContains(q)
+                    || app.bundleID.localizedCaseInsensitiveContains(q)
+            },
+            selection: $selection,
+            row: { app, isSelected in
+                AppPaletteRow(app: app, isSelected: isSelected)
+            },
+            placeholder: "Search browsers",
+            emptyTitle: "No browsers match",
+            emptySubtitle: "Sluice discovers any installed browser.",
+            initialFocus: initialFocus,
+            height: height,
+            onCommit: { _ in onCommit?() }
+        )
+    }
+}
+
+struct AppPaletteRow: View {
+    let app: AppInfo
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: DS.Space.m) {
+            AppIconView(app: app, size: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(app.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                Text(app.bundleID)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: DS.Space.s)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
         }
     }
 }

@@ -49,9 +49,12 @@ struct OverridePickerView: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
                 .onSubmit {
-                    if let first = filteredBrowsers.first {
-                        onPick(first.bundleID)
-                    }
+                    // Only commit when the user has typed a filter — pressing
+                    // Return with an empty field would otherwise open whichever
+                    // browser sorts first, which is a surprise.
+                    guard !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                          let first = filteredBrowsers.first else { return }
+                    onPick(first.bundleID)
                 }
                 .padding(.horizontal, 14)
 
@@ -106,11 +109,12 @@ private struct OverridePickerRow: View {
                 .contentShape(Rectangle())
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(hovered ? Color.accentColor.opacity(0.18) : Color.clear)
+                        .fill(hovered ? DS.SurfaceFill.rowHover : Color.clear)
                         .padding(.horizontal, 8)
                 )
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
+        .animation(DS.Motion.hover, value: hovered)
     }
 }

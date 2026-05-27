@@ -1,3 +1,5 @@
+![Sluice — route every link to the right browser.](docs/assets/github-preview.png)
+
 # Sluice
 
 A macOS URL router that opens links from different source apps in different browsers.

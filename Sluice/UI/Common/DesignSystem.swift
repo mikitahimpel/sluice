@@ -71,13 +71,13 @@ struct BrandMark: View {
     var body: some View {
         Canvas { ctx, canvasSize in
             let w = canvasSize.width
-            let barW = w * 0.42
-            let barH = w * 0.155
-            let dx = w * 0.22
-            let dy = w * 0.20
+            let barW = w * 0.56
+            let barH = w * 0.135
+            let dx = w * 0.16
+            let dy = w * 0.19
             let cx = w / 2
             let cy = w / 2
-            let tilt = Angle(degrees: 30)
+            let tilt = Angle(degrees: 35)
             for offset in -1...1 {
                 let bx = cx + CGFloat(offset) * dx
                 let by = cy - CGFloat(offset) * dy

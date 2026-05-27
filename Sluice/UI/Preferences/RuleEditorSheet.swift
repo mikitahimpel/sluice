@@ -79,6 +79,12 @@ struct RuleEditorSheet: View {
         }
         .frame(width: 720, height: 520)
         .background(.windowBackground)
+        // matchedGeometryEffect propagates animations through the sheet's
+        // presentation transaction and ignores per-modifier `.animation(nil)`.
+        // Suppress every inherited transaction during the first paint.
+        .transaction { transaction in
+            if !didAppear { transaction.disablesAnimations = true }
+        }
         .onAppear {
             // Flip on the next runloop tick so the first paint resolves with
             // `didAppear == false` and the gated `.animation(_, value:)`

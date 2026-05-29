@@ -4,17 +4,41 @@ import SluiceCore
 struct RulesTab: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @State private var editing: EditingTarget?
+    @State private var showAIRules: Bool = false
     @State private var testURLString: String = ""
     @State private var testSourceBundleID: String?
     @State private var testResult: Result<RoutePreview, RoutePreviewError>?
     @State private var showTester: Bool = false
-    @State private var showAIRulesSheet: Bool = false
 
     private var browsers: [AppInfo] { coordinator.installedBrowsers }
     private var apps: [AppInfo] { coordinator.installedApps }
     private var chromeProfiles: [ChromeProfile] { coordinator.chromeProfiles }
 
     var body: some View {
+        ZStack {
+            if let target = editing {
+                editorPage(for: target)
+                    .transition(.pageForward)
+            } else if showAIRules {
+                aiPage
+                    .transition(.pageForward)
+            } else {
+                rulesListView
+                    .transition(.pageBackward)
+            }
+        }
+        .animation(DS.Motion.reveal, value: routeID)
+    }
+
+    // Distinguishes the three content states so `.animation(value:)` knows
+    // when to run the page transition.
+    private var routeID: Int {
+        if editing != nil { return 1 }
+        if showAIRules { return 2 }
+        return 0
+    }
+
+    private var rulesListView: some View {
         VStack(spacing: 0) {
             header
 
@@ -27,31 +51,50 @@ struct RulesTab: View {
             footer
         }
         .background(.windowBackground)
-        .sheet(item: $editing) { target in
-            RuleEditorSheet(
-                initialRule: rule(for: target),
-                apps: apps,
-                browsers: browsers,
-                chromeProfiles: chromeProfiles,
-                onSave: { saved in
-                    apply(savedRule: saved, target: target)
-                    editing = nil
-                },
-                onCancel: { editing = nil }
-            )
-        }
-        .sheet(isPresented: $showAIRulesSheet) {
-            AIRulesSheet(
-                apps: apps,
-                browsers: browsers,
-                currentDefaultBrowser: coordinator.ruleSet.defaultBrowser,
-                onApply: { incoming, mode in
-                    applyAIRules(incoming, mode: mode)
-                    showAIRulesSheet = false
-                },
-                onCancel: { showAIRulesSheet = false }
-            )
-        }
+    }
+
+    // MARK: Pages
+
+    private func editorPage(for target: EditingTarget) -> some View {
+        RuleEditorSheet(
+            initialRule: rule(for: target),
+            apps: apps,
+            browsers: browsers,
+            chromeProfiles: chromeProfiles,
+            onSave: { saved in
+                apply(savedRule: saved, target: target)
+                dismissPage()
+            },
+            onCancel: { dismissPage() }
+        )
+    }
+
+    private var aiPage: some View {
+        AIRulesSheet(
+            apps: apps,
+            browsers: browsers,
+            currentDefaultBrowser: coordinator.ruleSet.defaultBrowser,
+            onApply: { incoming, mode in
+                applyAIRules(incoming, mode: mode)
+                dismissPage()
+            },
+            onCancel: { dismissPage() }
+        )
+    }
+
+    private func openEditor(_ target: EditingTarget) {
+        showAIRules = false
+        editing = target
+    }
+
+    private func openAIRules() {
+        editing = nil
+        showAIRules = true
+    }
+
+    private func dismissPage() {
+        editing = nil
+        showAIRules = false
     }
 
     private func applyAIRules(_ incoming: RuleSet, mode: AIRulesSheet.ApplyMode) {
@@ -93,7 +136,7 @@ struct RulesTab: View {
             Spacer()
             if !coordinator.ruleSet.rules.isEmpty {
                 Button {
-                    showAIRulesSheet = true
+                    openAIRules()
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "sparkles")
@@ -104,7 +147,7 @@ struct RulesTab: View {
                 .buttonStyle(GhostButtonStyle())
 
                 Button {
-                    editing = .new
+                    openEditor(.new)
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus")
@@ -163,7 +206,7 @@ struct RulesTab: View {
             }
             HStack(spacing: DS.Space.s) {
                 Button {
-                    editing = .new
+                    openEditor(.new)
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus")
@@ -174,7 +217,7 @@ struct RulesTab: View {
                 .buttonStyle(PrimaryPillButtonStyle())
 
                 Button {
-                    showAIRulesSheet = true
+                    openAIRules()
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "sparkles")
@@ -202,7 +245,7 @@ struct RulesTab: View {
                         chromeProfiles: chromeProfiles,
                         onToggleEnabled: { newValue in toggle(ruleID: rule.id, enabled: newValue) },
                         onDelete: { delete(ruleID: rule.id) },
-                        onEdit: { editing = .existing(rule.id) },
+                        onEdit: { openEditor(.existing(rule.id)) },
                         onMoveUp: { moveOne(ruleID: rule.id, delta: -1) },
                         onMoveDown: { moveOne(ruleID: rule.id, delta: 1) }
                     )
@@ -434,6 +477,18 @@ private enum EditingTarget: Identifiable {
         case .new: return "new"
         case .existing(let uuid): return uuid.uuidString
         }
+    }
+}
+
+private extension AnyTransition {
+    /// A page pushed in from the right (editor / AI pages).
+    static var pageForward: AnyTransition {
+        .offset(x: 26).combined(with: .opacity)
+    }
+
+    /// The list, which recedes slightly left as a page covers it.
+    static var pageBackward: AnyTransition {
+        .offset(x: -18).combined(with: .opacity)
     }
 }
 

@@ -14,10 +14,6 @@ struct RuleEditorSheet: View {
     @State private var urlHostGlob: String
     @State private var targetBundleID: String?
     @State private var chromeProfile: String?
-    // Gates entrance animations — without this the pane ZStack and the
-    // Chrome-profile transition play on first render because SwiftUI inherits
-    // the sheet's presentation transaction.
-    @State private var didAppear: Bool = false
 
     init(
         initialRule: Rule?,
@@ -77,26 +73,22 @@ struct RuleEditorSheet: View {
             Rectangle().fill(DS.Hairline.color).frame(height: DS.Hairline.width)
             footer
         }
-        .frame(width: 720, height: 520)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.windowBackground)
-        // matchedGeometryEffect propagates animations through the sheet's
-        // presentation transaction and ignores per-modifier `.animation(nil)`.
-        // Suppress every inherited transaction during the first paint.
-        .transaction { transaction in
-            if !didAppear { transaction.disablesAnimations = true }
-        }
-        .onAppear {
-            // Flip on the next runloop tick so the first paint resolves with
-            // `didAppear == false` and the gated `.animation(_, value:)`
-            // modifiers below stay nil for that frame.
-            DispatchQueue.main.async { didAppear = true }
-        }
     }
 
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Space.s) {
+        HStack(alignment: .center, spacing: DS.Space.m) {
+            Button(action: onCancel) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Back to rules")
+            .keyboardShortcut("[", modifiers: .command)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(initialRule == nil ? "New Rule" : "Edit Rule")
                     .font(.system(size: 15, weight: .semibold))
@@ -121,7 +113,7 @@ struct RuleEditorSheet: View {
                 Spacer()
             }
 
-            MatchKindSwitcher(selection: $matchKind)
+            MatchKindTabs(selection: $matchKind)
 
             ZStack(alignment: .topLeading) {
                 switch matchKind {
@@ -152,11 +144,7 @@ struct RuleEditorSheet: View {
                 }
             }
             .frame(height: 240, alignment: .top)
-            // `.animation(_, value:)` keeps its own animation state and is
-            // NOT subject to the parent's `transaction.disablesAnimations`.
-            // Pass `nil` while the sheet is presenting so neither the pane
-            // transition nor the implicit fade can play on first paint.
-            .animation(didAppear ? DS.Motion.reveal : nil, value: matchKind)
+            .animation(DS.Motion.reveal, value: matchKind)
         }
     }
 
@@ -200,10 +188,7 @@ struct RuleEditorSheet: View {
                 chromeProfile = nil
             }
         }
-        .animation(
-            didAppear ? DS.Motion.reveal : nil,
-            value: targetBundleID == chromeBundleID
-        )
+        .animation(DS.Motion.reveal, value: targetBundleID == chromeBundleID)
     }
 
     // MARK: Footer
@@ -297,50 +282,53 @@ private enum MatchKind: Hashable {
     case urlHost
 }
 
-private struct MatchKindSwitcher: View {
+private struct MatchKindTabs: View {
     @Binding var selection: MatchKind
-    @Namespace private var indicatorNamespace
+    @Namespace private var underline
 
     var body: some View {
-        HStack(spacing: 2) {
-            chip(.sourceApp, title: "Source app", systemImage: "app.dashed")
-            chip(.urlHost, title: "URL host", systemImage: "link")
+        HStack(spacing: DS.Space.l) {
+            tab(.sourceApp, title: "Source app", systemImage: "app.dashed")
+            tab(.urlHost, title: "URL host", systemImage: "link")
+            Spacer(minLength: 0)
         }
-        .padding(2)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.surface, style: .continuous)
-                .fill(DS.SurfaceFill.card)
-        )
-        .hairline()
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(DS.Hairline.color)
+                .frame(height: DS.Hairline.width)
+        }
+        // Scoped to the tab strip — the sliding underline animates here, the
+        // pane below animates on its own `value: matchKind`, so the two never
+        // share a transaction.
+        .animation(DS.Motion.indicator, value: selection)
     }
 
-    private func chip(_ kind: MatchKind, title: String, systemImage: String) -> some View {
+    private func tab(_ kind: MatchKind, title: String, systemImage: String) -> some View {
         let selected = selection == kind
         return Button {
-            withAnimation(DS.Motion.indicator) { selection = kind }
+            selection = kind
         } label: {
-            ZStack {
-                if selected {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(0.09))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-                        )
-                        .matchedGeometryEffect(id: "matchKindIndicator", in: indicatorNamespace)
-                }
-
+            VStack(spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: systemImage)
-                        .font(.system(size: 11, weight: .medium))
-                    Text(title)
                         .font(.system(size: 12, weight: .medium))
+                    Text(title)
+                        .font(.system(size: 13, weight: selected ? .semibold : .medium))
                 }
-                .padding(.horizontal, DS.Space.m)
-                .padding(.vertical, 5)
-                .frame(maxWidth: .infinity)
-                .foregroundStyle(selected ? .primary : .secondary)
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+
+                ZStack {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 1, style: .continuous)
+                            .fill(Color.accentColor)
+                            .matchedGeometryEffect(id: "whenTabUnderline", in: underline)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(height: 2)
             }
+            // Hit target spans the whole tab (icon, label, underline slot).
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

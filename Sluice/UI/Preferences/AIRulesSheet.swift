@@ -35,7 +35,7 @@ struct AIRulesSheet: View {
             Rectangle().fill(DS.Hairline.color).frame(height: DS.Hairline.width)
             footer
         }
-        .frame(width: 680, height: 620)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.windowBackground)
         .onChange(of: pastedJSON) { _, _ in revalidate() }
         .onDisappear { promptCopiedResetTask?.cancel() }
@@ -44,7 +44,15 @@ struct AIRulesSheet: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: DS.Space.m) {
+            Button(action: onCancel) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Back to rules")
+            .keyboardShortcut("[", modifiers: .command)
+
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
